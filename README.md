@@ -21,9 +21,8 @@ live in `AGENTS.md`:
 - verification from the project's real commands, with the actual output shown
 - commits only when explicitly asked
 
-The TDD cycle is visible in the test suite: 57 tests for 276 lines of source,
-one behavior per test, including the negative cases for amount, category, and
-date validation.
+The TDD cycle is visible in the test suite: 64 tests, one behavior per test,
+including the negative cases for amount, category, and date validation.
 
 ## Install
 
@@ -40,6 +39,7 @@ uv run expense-tracker add AMOUNT CATEGORY [--date YYYY-MM-DD] [--db PATH]
 uv run expense-tracker list [--category NAME] [--db PATH]
 uv run expense-tracker total [--month YYYY-MM] [--db PATH]
 uv run expense-tracker delete ID [--db PATH]
+uv run expense-tracker export [-o PATH] [--db PATH]
 ```
 
 `--db` works before or after the subcommand. Without it, the database lives at
@@ -129,18 +129,71 @@ deleted #3
 
 Deleting an unknown id is not an error.
 
+### export
+
+Writes every expense as CSV, in the same order as `list`, newest first.
+
+```bash
+uv run expense-tracker export
+```
+
+```
+id,date,amount,category
+4,2026-04-02,340.25,groceries
+3,2026-03-05,15.00,coffee
+2,2026-03-03,42.90,groceries
+1,2026-03-01,1250.00,rent
+```
+
+Or straight to a file:
+
+```bash
+uv run expense-tracker export --output expenses.csv
+```
+
+```
+exported 4 expenses to expenses.csv
+```
+
+Without `-o` the CSV is the only thing on stdout, so `export > out.csv` and
+`export -o out.csv` produce the same bytes. An existing file is overwritten.
+
+`amount` is a decimal string like `42.90` rather than integer cents, so a
+spreadsheet reads it as a number. Lines end in `\n`, not the `\r\n` the `csv`
+module writes by default: the terminator is set explicitly and the file is
+opened with `newline=""`, so the written bytes should not depend on the
+platform. That is a code-level argument, not a measurement — see
+[Platform coverage](#platform-coverage).
+
+There are no filters: `export` always writes every expense. An empty
+database writes just the header row. If `-o` points somewhere unwritable,
+the reason goes to stderr and the exit code is 1.
+
 ## Exit codes
 
 | Code | Meaning |
 | --- | --- |
 | 0 | success |
-| 1 | validation error, message on stderr |
+| 1 | validation error or failed write, message on stderr |
 | 2 | wrong arguments |
 
 ```
 $ uv run expense-tracker add abc food
 error: amount must be a positive number with at most 2 decimals: 'abc'
 ```
+
+## Platform coverage
+
+The test suite has only ever been run on macOS (darwin). Every claim in this
+README is verified there and nowhere else.
+
+That matters most for `export`, which asserts that CSV lines end in `\n`
+rather than the `\r\n` the `csv` module emits by default. The terminator is
+set explicitly and files are opened with `newline=""`, so the bytes ought to
+be identical on any platform — but "ought to be" is reasoning, not evidence.
+
+Linux and Windows are untested. If you run the suite there and it is clean,
+this section is the thing to update.
 
 ## Development
 
@@ -161,4 +214,4 @@ tests/                             one pytest module per source module
 ```
 
 See `AGENTS.md` for the conventions this project expects from contributors and
-agents.
+agents. Verified on macOS only — see [Platform coverage](#platform-coverage).

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import sys
 from datetime import date
 from pathlib import Path
+from typing import TextIO
 
 from expense_tracker.models import Expense, InvalidAmount, InvalidCategory
 from expense_tracker.repository import ExpenseRepository
@@ -45,6 +47,10 @@ def build_parser() -> argparse.ArgumentParser:
     delete.add_argument("id", type=int)
     add_db_option(delete, argparse.SUPPRESS)
 
+    export = subparsers.add_parser("export", help="write expenses as CSV")
+    export.add_argument("-o", "--output", type=Path, help="write CSV here instead of stdout")
+    add_db_option(export, argparse.SUPPRESS)
+
     return parser
 
 
@@ -67,7 +73,9 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_total(repo, args)
         if args.command == "delete":
             return _cmd_delete(repo, args)
-    except (InvalidAmount, InvalidCategory, ValueError) as error:
+        if args.command == "export":
+            return _cmd_export(repo, args)
+    except (InvalidAmount, InvalidCategory, ValueError, OSError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
 
@@ -130,6 +138,26 @@ def _cmd_delete(repo: ExpenseRepository, args: argparse.Namespace) -> int:
     repo.delete(args.id)
     print(f"deleted #{args.id}")
     return 0
+
+
+def _cmd_export(repo: ExpenseRepository, args: argparse.Namespace) -> int:
+    expenses = repo.list_all()
+    if args.output:
+        with args.output.open("w", encoding="utf-8", newline="") as handle:
+            _write_csv(expenses, handle)
+        print(f"exported {len(expenses)} expenses to {args.output}")
+        return 0
+    _write_csv(expenses, sys.stdout)
+    return 0
+
+
+def _write_csv(expenses: list[Expense], stream: TextIO) -> None:
+    writer = csv.writer(stream, lineterminator="\n")
+    writer.writerow(["id", "date", "amount", "category"])
+    for expense in expenses:
+        writer.writerow(
+            [expense.id, expense.spent_on.isoformat(), expense.formatted_amount, expense.category]
+        )
 
 
 def _format_cents(cents: int) -> str:

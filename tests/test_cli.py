@@ -1,3 +1,4 @@
+import csv
 from pathlib import Path
 
 import pytest
@@ -172,6 +173,75 @@ class TestDeleteCommand:
         exit_code = run(db, "delete", "999")
 
         assert exit_code == 0
+
+
+class TestExportCommand:
+    def test_writes_header_to_stdout_for_empty_database(self, db, capsys):
+        exit_code = run(db, "export")
+
+        assert exit_code == 0
+        assert capsys.readouterr().out == "id,date,amount,category\n"
+
+    def test_writes_one_row_per_expense_in_list_order(self, db, capsys):
+        run(db, "add", "1.00", "food", "--date", "2026-03-01")
+        run(db, "add", "2.50", "transport", "--date", "2026-03-10")
+        capsys.readouterr()
+
+        run(db, "export")
+
+        rows = list(csv.reader(capsys.readouterr().out.splitlines()))
+        assert [(row[0], row[1], row[3]) for row in rows[1:]] == [
+            ("2", "2026-03-10", "transport"),
+            ("1", "2026-03-01", "food"),
+        ]
+
+    def test_writes_amount_as_decimal_string_not_cents(self, db, capsys):
+        run(db, "add", "2.50", "transport", "--date", "2026-03-10")
+        capsys.readouterr()
+
+        run(db, "export")
+
+        rows = list(csv.reader(capsys.readouterr().out.splitlines()))
+        assert rows[1][2] == "2.50"
+
+    def test_stdout_contains_nothing_but_csv(self, db, capsys):
+        run(db, "add", "1.00", "food", "--date", "2026-03-01")
+        capsys.readouterr()
+
+        exit_code = run(db, "export")
+
+        assert exit_code == 0
+        assert capsys.readouterr().out == "id,date,amount,category\n1,2026-03-01,1.00,food\n"
+
+    def test_output_flag_writes_same_csv_to_file(self, db, tmp_path, capsys):
+        run(db, "add", "1.00", "food", "--date", "2026-03-01")
+        run(db, "add", "2.50", "transport", "--date", "2026-03-10")
+        capsys.readouterr()
+        target = tmp_path / "out.csv"
+
+        exit_code = run(db, "export", "-o", str(target))
+
+        assert exit_code == 0
+        assert target.read_text(encoding="utf-8") == (
+            "id,date,amount,category\n2,2026-03-10,2.50,transport\n1,2026-03-01,1.00,food\n"
+        )
+
+    def test_unwritable_output_path_returns_error_code(self, db, tmp_path, capsys):
+        missing = tmp_path / "nope" / "out.csv"
+
+        exit_code = run(db, "export", "-o", str(missing))
+
+        assert exit_code == 1
+        assert "out.csv" in capsys.readouterr().err
+
+    def test_file_lines_use_lf_not_crlf(self, db, tmp_path, capsys):
+        run(db, "add", "1.00", "food", "--date", "2026-03-01")
+        capsys.readouterr()
+        target = tmp_path / "out.csv"
+
+        run(db, "export", "-o", str(target))
+
+        assert target.read_bytes() == b"id,date,amount,category\n1,2026-03-01,1.00,food\n"
 
 
 class TestUnknownCommand:
