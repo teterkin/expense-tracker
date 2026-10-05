@@ -3,6 +3,28 @@
 Console expense tracker. Stores records in SQLite, sums by category and by
 month. Money is handled as integer cents, so no rounding drift.
 
+> **This is a throwaway practice project.** It exists to exercise a
+> TDD-and-PRD workflow with an AI coding agent, not to be a real product. The
+> feature set is deliberately small so the whole thing can be built and reviewed
+> end to end in one sitting. Do not depend on it, and feel free to throw it away
+> once the workflow has been validated.
+
+## How it was built
+
+Every behavior here was written test-first. The rules that governed the work
+live in `AGENTS.md`:
+
+- one failing test observed before any production code
+- the smallest change that makes it pass, then refactor with the suite green
+- no PRD for changes this small, but a PRD first for anything that forks the
+  design
+- verification from the project's real commands, with the actual output shown
+- commits only when explicitly asked
+
+The TDD cycle is visible in the test suite: 57 tests for 276 lines of source,
+one behavior per test, including the negative cases for amount, category, and
+date validation.
+
 ## Install
 
 Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/).
