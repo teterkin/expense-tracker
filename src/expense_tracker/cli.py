@@ -115,11 +115,19 @@ def _cmd_total(repo: ExpenseRepository, args: argparse.Namespace) -> int:
     if args.month:
         try:
             year_text, month_text = args.month.split("-")
-            cents = repo.total_for_month(int(year_text), int(month_text))
+            year, month = int(year_text), int(month_text)
         except ValueError:
             print(f"error: month must be in YYYY-MM format, got {args.month!r}", file=sys.stderr)
             return 1
-        print(f"total for {args.month}: {_format_cents(cents)}")
+        totals = repo.total_by_category_for_month(year, month)
+        grand_total = repo.total_for_month(year, month)
+        if not totals:
+            print(f"total for {args.month}: {_format_cents(grand_total)}")
+            return 0
+        print(f"total for {args.month}")
+        for category, cents in sorted(totals.items()):
+            print(f"{category:<20} {_format_cents(cents):>12}")
+        print(f"{'TOTAL':<20} {_format_cents(grand_total):>12}")
         return 0
 
     totals = repo.total_by_category()

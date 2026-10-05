@@ -21,7 +21,7 @@ live in `AGENTS.md`:
 - verification from the project's real commands, with the actual output shown
 - commits only when explicitly asked
 
-The TDD cycle is visible in the test suite: 64 tests, one behavior per test,
+The TDD cycle is visible in the test suite: 76 tests, one behavior per test,
 including the negative cases for amount, category, and date validation.
 
 ## Install
@@ -112,10 +112,17 @@ uv run expense-tracker total --month 2026-03
 ```
 
 ```
-total for 2026-03: 1307.90
+total for 2026-03
+coffee                      15.00
+groceries                   42.90
+rent                      1250.00
+TOTAL                     1307.90
 ```
 
-No expenses in the period means `0.00`.
+Only that month counts, and categories are listed by name. The month total is
+printed exactly once: in the `TOTAL` row, or in the header when the month has no
+expenses at all, `total for 2026-03: 0.00`. The month total comes from SQL, not
+from summing the printed rows.
 
 ### delete
 

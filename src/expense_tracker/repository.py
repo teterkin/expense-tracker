@@ -18,6 +18,12 @@ CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses (category);
 """
 
 
+def _month_prefix(year: int, month: int) -> str:
+    if not 1 <= month <= 12:
+        raise ValueError(f"month must be in 1..12, got {month}")
+    return f"{year:04d}-{month:02d}"
+
+
 class ExpenseRepository:
     def __init__(self, db_path: Path | str) -> None:
         self._connection = sqlite3.connect(db_path)
@@ -58,15 +64,20 @@ class ExpenseRepository:
         return {row["category"]: row["total"] for row in rows}
 
     def total_for_month(self, year: int, month: int) -> int:
-        if not 1 <= month <= 12:
-            raise ValueError(f"month must be in 1..12, got {month}")
-        prefix = f"{year:04d}-{month:02d}"
         row = self._connection.execute(
             "SELECT COALESCE(SUM(cents), 0) AS total FROM expenses "
             "WHERE substr(spent_on, 1, 7) = ?",
-            (prefix,),
+            (_month_prefix(year, month),),
         ).fetchone()
         return row["total"]
+
+    def total_by_category_for_month(self, year: int, month: int) -> dict[str, int]:
+        rows = self._connection.execute(
+            "SELECT category, SUM(cents) AS total FROM expenses "
+            "WHERE substr(spent_on, 1, 7) = ? GROUP BY category",
+            (_month_prefix(year, month),),
+        ).fetchall()
+        return {row["category"]: row["total"] for row in rows}
 
     def delete(self, expense_id: int) -> None:
         self._connection.execute("DELETE FROM expenses WHERE id = ?", (expense_id,))

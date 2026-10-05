@@ -84,6 +84,28 @@ class TestTotals:
     def test_total_by_category_is_empty_for_no_expenses(self, repo):
         assert repo.total_by_category() == {}
 
+    def test_total_by_category_for_month_sums_cents(self, repo):
+        repo.add(make("10.00", "food"))
+        repo.add(make("2.50", "food"))
+        repo.add(make("7.25", "transport"))
+
+        totals = repo.total_by_category_for_month(2026, 3)
+
+        assert totals == {"food": 1250, "transport": 725}
+
+    def test_total_by_category_for_month_ignores_other_months(self, repo):
+        repo.add(make("10.00", "food"))
+        repo.add(Expense(amount="99.00", category="food", spent_on=date(2026, 4, 5)))
+
+        totals = repo.total_by_category_for_month(2026, 3)
+
+        assert totals == {"food": 1000}
+
+    def test_total_by_category_for_month_is_empty_without_expenses(self, repo):
+        repo.add(make("10.00", "food"))
+
+        assert repo.total_by_category_for_month(2026, 12) == {}
+
     def test_total_for_month_ignores_other_months(self, repo):
         repo.add(Expense(amount="10.00", category="food", spent_on=date(2026, 3, 5)))
         repo.add(Expense(amount="99.00", category="food", spent_on=date(2026, 4, 5)))
@@ -94,6 +116,20 @@ class TestTotals:
 
     def test_total_for_month_without_expenses_is_zero(self, repo):
         assert repo.total_for_month(2026, 12) == 0
+
+    @pytest.mark.parametrize("month", [0, -1, 13])
+    def test_total_by_category_for_month_rejects_out_of_range_month(self, repo, month):
+        with pytest.raises(ValueError, match="month must be in 1..12"):
+            repo.total_by_category_for_month(2026, month)
+
+    def test_month_total_equals_sum_of_category_totals(self, repo):
+        repo.add(make("10.00", "food"))
+        repo.add(make("2.50", "food"))
+        repo.add(make("7.25", "transport"))
+
+        totals = repo.total_by_category_for_month(2026, 3)
+
+        assert sum(totals.values()) == repo.total_for_month(2026, 3) == 1975
 
     def test_rejects_out_of_range_month(self, repo):
         with pytest.raises(ValueError):

@@ -128,6 +128,56 @@ class TestTotalCommand:
         assert "12.50" in out
         assert "7.25" in out
 
+    def test_month_header_carries_no_number_when_categories_are_listed(self, db, capsys):
+        run(db, "add", "10.00", "food", "--date", "2026-03-05")
+        capsys.readouterr()
+
+        run(db, "total", "--month", "2026-03")
+
+        lines = capsys.readouterr().out.splitlines()
+        assert lines[0] == "total for 2026-03"
+        assert len(lines) == 3
+
+    def test_prints_category_breakdown_for_month(self, db, capsys):
+        run(db, "add", "10.00", "food", "--date", "2026-03-05")
+        run(db, "add", "2.50", "food", "--date", "2026-03-10")
+        run(db, "add", "7.25", "transport", "--date", "2026-03-15")
+        run(db, "add", "99.00", "food", "--date", "2026-04-05")
+        capsys.readouterr()
+
+        exit_code = run(db, "total", "--month", "2026-03")
+
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "food" in out
+        assert "12.50" in out
+        assert "transport" in out
+        assert "99.00" not in out
+
+    def test_prints_total_row_after_category_rows_for_month(self, db, capsys):
+        run(db, "add", "10.00", "food", "--date", "2026-03-05")
+        run(db, "add", "2.50", "food", "--date", "2026-03-10")
+        run(db, "add", "7.25", "transport", "--date", "2026-03-15")
+        capsys.readouterr()
+
+        run(db, "total", "--month", "2026-03")
+
+        assert [line.split() for line in capsys.readouterr().out.splitlines()[1:]] == [
+            ["food", "12.50"],
+            ["transport", "7.25"],
+            ["TOTAL", "19.75"],
+        ]
+
+    def test_orders_month_categories_by_name_not_by_amount(self, db, capsys):
+        run(db, "add", "50.00", "transport", "--date", "2026-03-05")
+        run(db, "add", "10.00", "food", "--date", "2026-03-10")
+        capsys.readouterr()
+
+        run(db, "total", "--month", "2026-03")
+
+        rows = capsys.readouterr().out.splitlines()
+        assert [row.split()[0] for row in rows[1:]] == ["food", "transport", "TOTAL"]
+
     def test_prints_total_for_single_month(self, db, capsys):
         run(db, "add", "10.00", "food", "--date", "2026-03-05")
         run(db, "add", "99.00", "food", "--date", "2026-04-05")
@@ -138,6 +188,15 @@ class TestTotalCommand:
         out = capsys.readouterr().out
         assert "10.00" in out
         assert "99.00" not in out
+
+    def test_empty_month_prints_only_the_zero_header(self, db, capsys):
+        run(db, "add", "10.00", "food", "--date", "2026-03-05")
+        capsys.readouterr()
+
+        exit_code = run(db, "total", "--month", "2026-12")
+
+        assert exit_code == 0
+        assert capsys.readouterr().out == "total for 2026-12: 0.00\n"
 
     def test_reports_zero_for_month_without_expenses(self, db, capsys):
         exit_code = run(db, "total", "--month", "2026-12")
